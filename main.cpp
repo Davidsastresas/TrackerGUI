@@ -47,10 +47,20 @@ int main(int argc, char *argv[])
 
     GstElement *pipeline = gst_pipeline_new (NULL);
     GstElement *src = gst_element_factory_make ("udpsrc", "udp");
+    GstElement *demux = gst_element_factory_make("rtph264depay", "rtp-h264-depacketizer");
     GstElement *parser = gst_element_factory_make("h264parse", "h264-parser");
     GstElement *decoder = gst_element_factory_make("avdec_h264", "h264-decoder");
     GstElement *videoconvert = gst_element_factory_make("videoconvert", "videoconvert");
     GstElement *glupload = gst_element_factory_make ("glupload", NULL);
+    GstElement *glcolorconvert = gst_element_factory_make ("glcolorconvert", NULL);
+    GstCaps *caps = NULL;
+
+    if ((caps = gst_caps_from_string("application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264")) == NULL) {
+        qCritical() << "VideoReceiver::start() failed. Error with gst_caps_from_string()";
+    }
+
+    g_object_set(G_OBJECT(src), "caps", caps, NULL);
+
     /* the plugin must be loaded before loading the qml file to register the
      * GstGLVideoItem qml item */
     GstElement *sink = gst_element_factory_make ("qmlglsink", NULL);
@@ -60,8 +70,8 @@ int main(int argc, char *argv[])
 
     g_assert (src && glupload && sink);
 
-    gst_bin_add_many (GST_BIN (pipeline), src, parser, decoder, videoconvert, glupload, sink, NULL);
-    if(!gst_element_link_many (src, parser, decoder, videoconvert, glupload, sink, NULL)){
+    gst_bin_add_many (GST_BIN (pipeline), src, demux, parser, decoder, videoconvert, glupload, glcolorconvert, sink, NULL);
+    if(!gst_element_link_many (src, demux, parser, decoder, videoconvert, glupload, glcolorconvert, sink, NULL)){
         qCritical() << "failed to link elements";
     }
 
