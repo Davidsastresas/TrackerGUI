@@ -33,6 +33,7 @@ SetPlaying::run ()
 {
   if (this->pipeline_)
     gst_element_set_state (this->pipeline_, GST_STATE_PLAYING);
+    qCritical() << "state set to playing";
 }
 
 int main(int argc, char *argv[])
@@ -45,16 +46,24 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
 
     GstElement *pipeline = gst_pipeline_new (NULL);
-    GstElement *src = gst_element_factory_make ("videotestsrc", NULL);
+    GstElement *src = gst_element_factory_make ("udpsrc", "udp");
+    GstElement *parser = gst_element_factory_make("h264parse", "h264-parser");
+    GstElement *decoder = gst_element_factory_make("avdec_h264", "h264-decoder");
+    GstElement *videoconvert = gst_element_factory_make("videoconvert", "videoconvert");
     GstElement *glupload = gst_element_factory_make ("glupload", NULL);
     /* the plugin must be loaded before loading the qml file to register the
      * GstGLVideoItem qml item */
     GstElement *sink = gst_element_factory_make ("qmlglsink", NULL);
 
+    g_object_set(G_OBJECT(src), "port", 5004, NULL);
+
+
     g_assert (src && glupload && sink);
 
-    gst_bin_add_many (GST_BIN (pipeline), src, glupload, sink, NULL);
-    gst_element_link_many (src, glupload, sink, NULL);
+    gst_bin_add_many (GST_BIN (pipeline), src, parser, decoder, videoconvert, glupload, sink, NULL);
+    if(!gst_element_link_many (src, parser, decoder, videoconvert, glupload, sink, NULL)){
+        qCritical() << "failed to link elements";
+    }
 
     QQmlApplicationEngine engine;
     engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
